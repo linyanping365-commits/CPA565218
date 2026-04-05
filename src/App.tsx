@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import SummaryChart from './components/SummaryChart';
@@ -6,6 +6,11 @@ import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import AdminDashboard from './components/AdminDashboard';
 import OffersPage from './components/OffersPage';
+import SettingsPage from './components/SettingsPage';
+import WalletPage from './components/WalletPage';
+import NotificationsPage from './components/NotificationsPage';
+import ClicksPage from './components/ClicksPage';
+import { formatPanelDate } from './lib/dateUtils';
 import { User, Mail, MessageSquare } from 'lucide-react';
 
 function StatCard({ title, approved, pending, gradient }: { title: string, approved: string, pending: string, gradient: string }) {
@@ -80,7 +85,7 @@ function ProfileCard({
   );
 }
 
-function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout }: { onNavigate: (view: any) => void, currentView: string, isAdmin: boolean, userEmail: string, onLogout: () => void }) {
+function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout, balance, withdrawals }: { onNavigate: (view: any) => void, currentView: string, isAdmin: boolean, userEmail: string, onLogout: () => void, balance: number, withdrawals: any[] }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar onNavigate={onNavigate} currentView={currentView} isAdmin={isAdmin} onLogout={onLogout} />
@@ -88,7 +93,7 @@ function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout }: { 
       
       <main className="ml-56 pt-16 p-6">
         {/* Top Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <StatCard 
             title="Today" 
             approved="$ 0.00" 
@@ -107,13 +112,75 @@ function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout }: { 
             pending="$ 0.00" 
             gradient="from-purple-500 to-indigo-400" 
           />
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100">
+            <div className={`h-10 flex items-center justify-center text-white font-bold text-sm bg-gradient-to-r from-green-500 to-emerald-400`}>
+              Balance
+            </div>
+            <div className="p-4 text-center">
+              <div className="text-gray-400 text-[10px] uppercase mb-1">Withdrawable</div>
+              <div className="text-green-600 font-bold text-lg">$ {balance.toFixed(2)}</div>
+            </div>
+          </div>
         </div>
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Chart Section */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 space-y-6">
             <SummaryChart />
+            
+            {/* Recent Withdrawals Table */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-4 border-b border-gray-50 flex items-center justify-between">
+                <h3 className="font-bold text-slate-800">Recent Withdrawals</h3>
+                <button 
+                  onClick={() => onNavigate('bell')}
+                  className="text-xs text-indigo-600 font-bold hover:underline"
+                >
+                  View All
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-gray-50/50">
+                      <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Date</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {withdrawals.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-8 text-center text-gray-400 text-xs">
+                          No recent withdrawals
+                        </td>
+                      </tr>
+                    ) : (
+                      withdrawals.slice(0, 5).map((w) => (
+                        <tr key={w.id} className="hover:bg-gray-50/30 transition-colors">
+                          <td className="px-4 py-3 text-xs text-slate-600">
+                            {formatPanelDate(w.date)}
+                          </td>
+                          <td className="px-4 py-3 text-xs font-bold text-slate-800">
+                            $ {w.amount.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              w.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                              w.status === 'Approved' ? 'bg-green-50 text-green-700 border-green-100' :
+                              'bg-red-50 text-red-700 border-red-100'
+                            }`}>
+                              {w.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
           {/* Profile Section */}
@@ -137,10 +204,57 @@ function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout }: { 
   );
 }
 
+interface Withdrawal {
+  id: string;
+  amount: number;
+  paypalEmail: string;
+  date: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+}
+
 export default function App() {
-  const [view, setView] = useState<'login' | 'register' | 'dashboard' | 'admin' | 'all-offers'>('login');
+  const [view, setView] = useState<'login' | 'register' | 'dashboard' | 'admin' | 'all-offers' | 'link-management' | 'api-access' | 'settings' | 'wallet' | 'bell' | 'clicks'>('login');
   const [allowedEmails, setAllowedEmails] = useState('2573838961@qq.com, 565218@qq.com');
   const [userEmail, setUserEmail] = useState('');
+  const [balance, setBalance] = useState(0); // Initial mock balance
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [clicks, setClicks] = useState<any[]>([]);
+
+  // Poll for balance and clicks updates from server
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch balance
+        const balanceRes = await fetch('/api/balance');
+        const balanceData = await balanceRes.json();
+        if (balanceData && typeof balanceData.balance === 'number') {
+          setBalance(balanceData.balance);
+        }
+
+        // Fetch clicks
+        const clicksRes = await fetch('/api/clicks');
+        const clicksData = await clicksRes.json();
+        if (Array.isArray(clicksData)) {
+          setClicks(clicksData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+      }
+    };
+
+    fetchData(); // Initial fetch
+    const interval = setInterval(fetchData, 5000); // Poll every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
+  const [trackingLinks, setTrackingLinks] = useState<Record<number, string>>(() => {
+    const saved = localStorage.getItem('trackingLinks');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const handleSaveTrackingLinks = (links: Record<number, string>) => {
+    setTrackingLinks(links);
+    localStorage.setItem('trackingLinks', JSON.stringify(links));
+  };
 
   const isAdmin = userEmail === '565218@qq.com';
 
@@ -171,7 +285,7 @@ export default function App() {
     );
   }
 
-  if (view === 'admin') {
+  if (view === 'admin' || view === 'link-management' || view === 'api-access') {
     return (
       <AdminDashboard 
         allowedEmails={allowedEmails} 
@@ -179,6 +293,9 @@ export default function App() {
         onNavigate={(v) => setView(v)}
         currentView={view}
         onLogout={handleLogout}
+        trackingLinks={trackingLinks}
+        onSaveTrackingLinks={handleSaveTrackingLinks}
+        initialTab={view === 'link-management' ? 'links' : view === 'api-access' ? 'api' : 'access'}
       />
     );
   }
@@ -190,9 +307,60 @@ export default function App() {
         currentView={view} 
         isAdmin={isAdmin} 
         onLogout={handleLogout} 
+        trackingLinks={trackingLinks}
       />
     );
   }
 
-  return <Dashboard onNavigate={(v) => setView(v)} currentView={view} isAdmin={isAdmin} userEmail={userEmail} onLogout={handleLogout} />;
+  if (view === 'settings') {
+    return (
+      <SettingsPage 
+        onNavigate={setView} 
+        currentView={view} 
+        isAdmin={isAdmin} 
+        userEmail={userEmail} 
+        onLogout={handleLogout} 
+      />
+    );
+  }
+
+  if (view === 'wallet') {
+    return (
+      <WalletPage 
+        onNavigate={setView} 
+        currentView={view} 
+        isAdmin={isAdmin} 
+        onLogout={handleLogout} 
+        balance={balance}
+        onUpdateBalance={setBalance}
+        onAddWithdrawal={(w) => setWithdrawals([w, ...withdrawals])}
+      />
+    );
+  }
+
+  if (view === 'bell') {
+    return (
+      <NotificationsPage 
+        onNavigate={setView} 
+        currentView={view} 
+        isAdmin={isAdmin} 
+        onLogout={handleLogout} 
+        withdrawals={withdrawals}
+      />
+    );
+  }
+
+  if (view === 'clicks') {
+    return (
+      <ClicksPage 
+        onNavigate={setView} 
+        currentView={view} 
+        isAdmin={isAdmin} 
+        onLogout={handleLogout} 
+        clicks={clicks}
+      />
+    );
+  }
+
+  return <Dashboard onNavigate={(v) => setView(v)} currentView={view} isAdmin={isAdmin} userEmail={userEmail} onLogout={handleLogout} balance={balance} withdrawals={withdrawals} />;
 }

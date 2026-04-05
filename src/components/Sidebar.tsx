@@ -1,4 +1,4 @@
-import { Home, Settings, Wallet, List, Settings2, Video, Bell, Info, LogOut, Tag } from 'lucide-react';
+import { Home, Settings, Wallet, Settings2, Bell, LogOut, Tag, Link as LinkIcon, Database, MousePointerClick } from 'lucide-react';
 
 interface SidebarProps {
   onNavigate: (view: any) => void;
@@ -10,13 +10,15 @@ export default function Sidebar({ onNavigate, currentView, isAdmin, onLogout }: 
   const menuItems = [
     { icon: Home, id: 'dashboard', label: 'Dashboard' },
     { icon: Tag, id: 'all-offers', label: 'All Offers' },
+    { icon: MousePointerClick, id: 'clicks', label: 'Clicks' },
     { icon: Settings, id: 'settings', label: 'Settings' },
     { icon: Wallet, id: 'wallet', label: 'Wallet' },
-    { icon: List, id: 'list', label: 'List' },
-    ...(isAdmin ? [{ icon: Settings2, id: 'admin', label: 'Admin' }] : []),
-    { icon: Video, id: 'video', label: 'Video' },
+    ...(isAdmin ? [
+      { icon: Settings2, id: 'admin', label: 'Admin' },
+      { icon: LinkIcon, id: 'link-management', label: 'Link Management' },
+      { icon: Database, id: 'api-access', label: 'API Access' }
+    ] : []),
     { icon: Bell, id: 'bell', label: 'Notifications' },
-    { icon: Info, id: 'info', label: 'Info' },
   ];
 
   return (
