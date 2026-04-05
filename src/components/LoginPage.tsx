@@ -15,14 +15,15 @@ export default function LoginPage({ onLogin, onSwitchToRegister, allowedEmails }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const allowedList = allowedEmails.split(/[\s,]+/).filter(Boolean);
+    const allowedList = allowedEmails.toLowerCase().split(/[\s,]+/).filter(Boolean);
+    const normalizedEmail = email.toLowerCase();
     
-    if (allowedList.length > 0 && !allowedList.includes(email)) {
+    if (allowedList.length > 0 && !allowedList.includes(normalizedEmail)) {
       setError('Your email is not in the allowed list. Please contact the administrator.');
       return;
     }
 
-    if (password !== email) {
+    if (password.toLowerCase() !== normalizedEmail) {
       setError('Incorrect password');
       return;
     }
@@ -63,6 +64,7 @@ export default function LoginPage({ onLogin, onSwitchToRegister, allowedEmails }
             className="w-full px-4 py-2 bg-blue-50/50 border border-blue-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400/20 text-slate-700"
             required
           />
+          <p className="text-[10px] text-slate-400 italic">Hint: For this demo, use your email as the password.</p>
         </div>
 
         <div className="flex items-center">
