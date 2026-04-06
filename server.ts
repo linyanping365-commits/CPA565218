@@ -14,14 +14,26 @@ async function startServer() {
 
   app.use(cors());
   // In-memory user data store (for demo purposes)
-  // Key: userEmail, Value: { balance: number, clicks: any[] }
-  const userStore = new Map<string, { balance: number, clicks: any[] }>();
+  // Key: userEmail, Value: { balance: number, pendingBalance: number, totalEarned: number, totalWithdrawals: number, clicks: any[] }
+  const userStore = new Map<string, { 
+    balance: number, 
+    pendingBalance: number, 
+    totalEarned: number, 
+    totalWithdrawals: number, 
+    clicks: any[] 
+  }>();
   // To track processed transaction IDs (idempotency)
   const processedTransactions = new Set<string>();
 
   const getUserData = (email: string) => {
     if (!userStore.has(email)) {
-      userStore.set(email, { balance: 0, clicks: [] });
+      userStore.set(email, { 
+        balance: 0, 
+        pendingBalance: 0, 
+        totalEarned: 0, 
+        totalWithdrawals: 0, 
+        clicks: [] 
+      });
     }
     return userStore.get(email)!;
   };
@@ -29,15 +41,16 @@ async function startServer() {
   // API routes
   app.use(express.json()); // Enable JSON body parsing
 
-  app.get("/api/offers", (req, res) => {
-    res.json(ALL_OFFERS);
-  });
-
   app.get("/api/balance", (req, res) => {
     const email = req.query.email as string;
     if (!email) return res.status(400).json({ error: "Email is required" });
     const userData = getUserData(email);
-    res.json({ balance: userData.balance });
+    res.json({ 
+      balance: userData.balance,
+      pendingBalance: userData.pendingBalance,
+      totalEarned: userData.totalEarned,
+      totalWithdrawals: userData.totalWithdrawals
+    });
   });
 
   app.get("/api/clicks", (req, res) => {
@@ -52,15 +65,22 @@ async function startServer() {
     const authHeader = req.headers.authorization;
     const expectedToken = process.env.WEBHOOK_TOKEN || "your_secure_token_here";
 
+    console.log('Task Completed Request:', {
+      auth: authHeader,
+      body: req.body
+    });
+
     // 1. Authentication check
     if (!authHeader || authHeader !== `Bearer ${expectedToken}`) {
+      console.log('Auth failed:', { authHeader, expectedToken });
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
     const { userId, taskInfo, earnings, transactionId } = req.body;
 
     // 2. Validate required fields
-    if (!userId || !earnings || !transactionId) {
+    if (!userId || earnings === undefined || !transactionId) {
+      console.log('Validation failed:', { userId, earnings, transactionId });
       return res.status(400).json({ success: false, message: "Missing required fields: userId, earnings, transactionId" });
     }
 
@@ -77,6 +97,7 @@ async function startServer() {
     // 4. Update user data
     const userData = getUserData(userId);
     userData.balance += amount;
+    userData.totalEarned += amount;
     
     const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
     const clickEntry = {
@@ -104,33 +125,56 @@ async function startServer() {
     });
   });
 
-  app.get("/api/postback", (req, res) => {
-    const { payout, status, click_id, userId } = req.query;
-    const targetUser = (userId as string) || "global";
-    const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
+  // Admin API to list all users
+  app.get("/api/admin/users", (req, res) => {
+    const users = Array.from(userStore.entries()).map(([email, data]) => ({
+      email,
+      balance: data.balance,
+      pendingBalance: data.pendingBalance,
+      totalEarned: data.totalEarned,
+      totalWithdrawals: data.totalWithdrawals,
+      clicksCount: data.clicks.length,
+      lastActivity: data.clicks[0]?.timestamp || 'Never'
+    }));
+    res.json(users);
+  });
+
+  // Admin API to update specific user data
+  app.post("/api/admin/update-user", (req, res) => {
+    const { email, balance, pendingBalance, totalEarned, totalWithdrawals, clicks, taskInfo } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required" });
+
+    const userData = getUserData(email);
     
-    const clickEntry = {
-      id: click_id || `clk_${Math.random().toString(36).substr(2, 9)}`,
-      payout: payout || '0.00',
-      status: status === 'approved' ? 'Success' : 'Failed',
-      timestamp,
-      raw: req.query
-    };
-
-    const userData = getUserData(targetUser);
-    userData.clicks.unshift(clickEntry);
-    if (userData.clicks.length > 100) userData.clicks.pop();
-
-    if (status === 'approved' && payout) {
-      const amount = parseFloat(payout as string);
-      if (!isNaN(amount)) {
-        userData.balance += amount;
-        console.log(`Postback received for ${targetUser}: +$${amount}. New balance: $${userData.balance}`);
-        return res.json({ success: true, newBalance: userData.balance });
-      }
+    // Check if balance is changing to add a sync record
+    if (typeof balance === 'number' && balance !== userData.balance) {
+      const diff = balance - userData.balance;
+      const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
+      userData.clicks.unshift({
+        id: `ADJ_${Date.now()}`,
+        payout: diff.toFixed(2),
+        status: 'Success',
+        timestamp,
+        taskInfo: taskInfo || (diff > 0 ? '对应的编号记录' : 'Manual Balance Adjustment (Debit)'),
+        type: 'Adjustment'
+      });
+      if (userData.clicks.length > 100) userData.clicks.pop();
     }
-    
-    res.status(400).json({ success: false, message: "Invalid payout or status", entry: clickEntry });
+
+    if (typeof balance === 'number') userData.balance = balance;
+    if (typeof pendingBalance === 'number') userData.pendingBalance = pendingBalance;
+    if (typeof totalEarned === 'number') userData.totalEarned = totalEarned;
+    if (typeof totalWithdrawals === 'number') userData.totalWithdrawals = totalWithdrawals;
+    if (Array.isArray(clicks)) userData.clicks = clicks;
+
+    res.json({ 
+      success: true, 
+      email, 
+      balance: userData.balance,
+      pendingBalance: userData.pendingBalance,
+      totalEarned: userData.totalEarned,
+      totalWithdrawals: userData.totalWithdrawals
+    });
   });
 
   // Vite middleware for development

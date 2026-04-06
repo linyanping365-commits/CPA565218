@@ -8,6 +8,7 @@ interface ClickEntry {
   payout: string;
   status: 'Success' | 'Failed';
   timestamp: string;
+  taskInfo?: string;
   raw: any;
 }
 
@@ -43,6 +44,7 @@ export default function ClicksPage({ onNavigate, currentView, isAdmin, onLogout,
                 <thead>
                   <tr className="bg-gray-50 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
                     <th className="px-6 py-4 border-b border-gray-100">Click ID</th>
+                    <th className="px-6 py-4 border-b border-gray-100">Task Name</th>
                     <th className="px-6 py-4 border-b border-gray-100">Payout</th>
                     <th className="px-6 py-4 border-b border-gray-100">Status</th>
                     <th className="px-6 py-4 border-b border-gray-100">Time</th>
@@ -54,6 +56,9 @@ export default function ClicksPage({ onNavigate, currentView, isAdmin, onLogout,
                       <tr key={click.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-6 py-4">
                           <span className="text-sm font-mono text-slate-600">{click.id}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-slate-700 font-medium">{click.taskInfo || 'External Task'}</span>
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-sm font-bold text-slate-800">${parseFloat(click.payout).toFixed(2)}</span>
