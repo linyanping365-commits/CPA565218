@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { ALL_OFFERS, type Offer } from '../lib/offersData';
 
-export default function OffersPage({ onNavigate, currentView, isAdmin, onLogout, trackingLinks = {} }: any) {
+export default function OffersPage({ onNavigate, currentView, isAdmin, userEmail, onLogout, trackingLinks = {} }: any) {
   const [filterMode, setFilterMode] = useState<'all' | 'no-approval' | 'approval'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
@@ -536,13 +536,19 @@ export default function OffersPage({ onNavigate, currentView, isAdmin, onLogout,
                         <h4 className="text-white font-bold text-sm mb-3">Default Affiliate Link :</h4>
                         <div className="relative">
                           <div className="bg-[#F8F9FA] p-3 rounded border border-gray-200 text-slate-600 text-sm font-mono break-all pr-20">
-                            {trackingLinks[selectedOffer.serialNumber] || `http://dealeraff.a1.arcanetechs.com/go.php?oid=${selectedOffer.serialNumber}&pid=q943&sub1={clickid}`}
+                            {(() => {
+                              const baseLink = trackingLinks[selectedOffer.serialNumber] || `http://dealeraff.a1.arcanetechs.com/go.php?oid=${selectedOffer.serialNumber}&pid=q943&sub1={clickid}`;
+                              const separator = baseLink.includes('?') ? '&' : '?';
+                              return `${baseLink}${separator}userId=${encodeURIComponent(userEmail)}`;
+                            })()}
                           </div>
                           <button 
                             onClick={() => {
-                              const link = trackingLinks[selectedOffer.serialNumber] || `http://dealeraff.a1.arcanetechs.com/go.php?oid=${selectedOffer.serialNumber}&pid=q943&sub1={clickid}`;
-                              navigator.clipboard.writeText(link);
-                              setNotification('Link copied to clipboard!');
+                              const baseLink = trackingLinks[selectedOffer.serialNumber] || `http://dealeraff.a1.arcanetechs.com/go.php?oid=${selectedOffer.serialNumber}&pid=q943&sub1={clickid}`;
+                              const separator = baseLink.includes('?') ? '&' : '?';
+                              const fullLink = `${baseLink}${separator}userId=${encodeURIComponent(userEmail)}`;
+                              navigator.clipboard.writeText(fullLink);
+                              setNotification('Link copied with User ID!');
                               setTimeout(() => setNotification(null), 2000);
                             }}
                             className="absolute right-2 top-1/2 -translate-y-1/2 bg-gray-200 hover:bg-gray-300 text-slate-700 px-3 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-colors"
@@ -550,6 +556,9 @@ export default function OffersPage({ onNavigate, currentView, isAdmin, onLogout,
                             <Download size={12} className="rotate-180" /> Copy
                           </button>
                         </div>
+                        <p className="text-[10px] text-white/80 mt-2 italic">
+                          * Your User ID ({userEmail}) has been automatically appended to track your earnings.
+                        </p>
                       </div>
 
                       {/* Macros Section */}

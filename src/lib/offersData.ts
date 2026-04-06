@@ -29,15 +29,16 @@ const generateRandomDates = () => {
 };
 
 const generateOffers = (): Offer[] => {
-  const offers: Offer[] = [];
+  const lowPayoutOffers: Offer[] = [];
+  const highPayoutOffers: Offer[] = [];
   
-  // 60 offers between $10 and $15
+  // 60 offers between $10 and $15 - FIXED SERIALS 1001-1060
   for (let i = 1; i <= 60; i++) {
     const price = (Math.random() * 5 + 10).toFixed(2);
     const dates = generateRandomDates();
-    offers.push({
+    lowPayoutOffers.push({
       id: `low-${i}`,
-      serialNumber: 0,
+      serialNumber: 1000 + i, // Permanent fixed number
       title: `(Web/Wap) #L${i} V2 (Biweekly) - Premium Offer - US/UK/CA - CC Submit`,
       payout: `$${price}`,
       countries: ['us', 'gb', 'ca'],
@@ -50,9 +51,9 @@ const generateOffers = (): Offer[] => {
   for (let i = 1; i <= 1980; i++) {
     const price = (Math.random() * 24 + 16).toFixed(2);
     const dates = generateRandomDates();
-    offers.push({
+    highPayoutOffers.push({
       id: `high-${i}`,
-      serialNumber: 0,
+      serialNumber: 1060 + i,
       title: `(Web/Wap) #H${i} V2 (Biweekly) - High Value Campaign - Global - CC Submit`,
       payout: `$${price}`,
       countries: ['us', 'kr', 'tw', 'hk'],
@@ -61,17 +62,16 @@ const generateOffers = (): Offer[] => {
     });
   }
 
-  for (let i = offers.length - 1; i > 0; i--) {
+  const allOffers = [...lowPayoutOffers, ...highPayoutOffers];
+
+  // Shuffle the combined list so they appear in random order, 
+  // but their serialNumber is already fixed.
+  for (let i = allOffers.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [offers[i], offers[j]] = [offers[j], offers[i]];
+    [allOffers[i], allOffers[j]] = [allOffers[j], allOffers[i]];
   }
 
-  let currentSerial = 1001;
-  for (let i = 0; i < offers.length; i++) {
-    offers[i].serialNumber = currentSerial++;
-  }
-
-  return offers;
+  return allOffers;
 };
 
 export const ALL_OFFERS = generateOffers();

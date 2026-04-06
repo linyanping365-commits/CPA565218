@@ -235,6 +235,7 @@ export default function App() {
         onNavigate={setView} 
         currentView={view} 
         isAdmin={isAdmin} 
+        userEmail={userEmail}
         onLogout={handleLogout} 
         trackingLinks={trackingLinks}
       />

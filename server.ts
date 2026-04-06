@@ -2,6 +2,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
+import cors from "cors";
 import { ALL_OFFERS } from "./src/lib/offersData.ts";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -11,6 +12,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(cors());
   // In-memory user data store (for demo purposes)
   // Key: userEmail, Value: { balance: number, clicks: any[] }
   const userStore = new Map<string, { balance: number, clicks: any[] }>();
