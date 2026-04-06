@@ -214,15 +214,6 @@ interface Withdrawal {
 
 export default function App() {
   const [view, setView] = useState<'login' | 'register' | 'dashboard' | 'admin' | 'all-offers' | 'link-management' | 'api-access' | 'settings' | 'wallet' | 'bell' | 'clicks'>('login');
-  const [allowedEmails, setAllowedEmails] = useState(() => {
-    const saved = localStorage.getItem('allowedEmails');
-    return saved || '2573838961@qq.com, 565218@qq.com';
-  });
-
-  const handleSaveAllowedEmails = (emails: string) => {
-    setAllowedEmails(emails);
-    localStorage.setItem('allowedEmails', emails);
-  };
   const [userEmail, setUserEmail] = useState('');
   const [balance, setBalance] = useState(0); // Initial mock balance
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -279,7 +270,6 @@ export default function App() {
           setView('dashboard');
         }} 
         onSwitchToRegister={() => setView('register')} 
-        allowedEmails={allowedEmails}
       />
     );
   }
@@ -288,7 +278,6 @@ export default function App() {
     return (
       <RegisterPage 
         onSwitchToLogin={() => setView('login')} 
-        allowedEmails={allowedEmails}
       />
     );
   }
@@ -296,14 +285,12 @@ export default function App() {
   if (view === 'admin' || view === 'link-management' || view === 'api-access') {
     return (
       <AdminDashboard 
-        allowedEmails={allowedEmails} 
-        onSave={handleSaveAllowedEmails} 
         onNavigate={(v) => setView(v)}
         currentView={view}
         onLogout={handleLogout}
         trackingLinks={trackingLinks}
         onSaveTrackingLinks={handleSaveTrackingLinks}
-        initialTab={view === 'link-management' ? 'links' : view === 'api-access' ? 'api' : 'access'}
+        initialTab={view === 'link-management' ? 'links' : view === 'api-access' ? 'api' : 'links'}
       />
     );
   }

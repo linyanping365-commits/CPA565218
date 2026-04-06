@@ -5,30 +5,24 @@ import { AlertCircle } from 'lucide-react';
 interface LoginPageProps {
   onLogin: (email: string) => void;
   onSwitchToRegister: () => void;
-  allowedEmails: string;
 }
 
-export default function LoginPage({ onLogin, onSwitchToRegister, allowedEmails }: LoginPageProps) {
+export default function LoginPage({ onLogin, onSwitchToRegister }: LoginPageProps) {
   const [email, setEmail] = useState('565218@qq.com');
   const [password, setPassword] = useState('565218@qq.com');
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const allowedList = allowedEmails.toLowerCase().split(/[\s,]+/).filter(Boolean);
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedPassword = password.toLowerCase().trim();
     
-    if (allowedList.length > 0 && !allowedList.includes(normalizedEmail)) {
-      setError('Your email is not in the allowed list. Please contact the administrator.');
+    if (normalizedPassword !== normalizedEmail) {
+      setError('Password must be the same as your email address.');
       return;
     }
 
-    if (password.toLowerCase() !== normalizedEmail) {
-      setError('Incorrect password');
-      return;
-    }
-
-    onLogin(email);
+    onLogin(normalizedEmail);
   };
 
   return (

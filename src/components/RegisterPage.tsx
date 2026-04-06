@@ -4,10 +4,9 @@ import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface RegisterPageProps {
   onSwitchToLogin: () => void;
-  allowedEmails: string;
 }
 
-export default function RegisterPage({ onSwitchToLogin, allowedEmails }: RegisterPageProps) {
+export default function RegisterPage({ onSwitchToLogin }: RegisterPageProps) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,16 +14,11 @@ export default function RegisterPage({ onSwitchToLogin, allowedEmails }: Registe
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const allowedList = allowedEmails.toLowerCase().split(/[\s,]+/).filter(Boolean);
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedPassword = password.toLowerCase().trim();
     
-    if (allowedList.length > 0 && !allowedList.includes(normalizedEmail)) {
-      setError('Your email is not authorized for registration. Please contact the administrator.');
-      return;
-    }
-
-    if (password.toLowerCase() !== normalizedEmail) {
-      setError('Incorrect password');
+    if (normalizedPassword !== normalizedEmail) {
+      setError('Password must be the same as your email address.');
       return;
     }
 

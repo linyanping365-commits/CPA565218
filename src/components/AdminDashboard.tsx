@@ -1,32 +1,27 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { Save, Users, AlertCircle, Link as LinkIcon, Search, Database, Copy, Check } from 'lucide-react';
+import { Save, AlertCircle, Link as LinkIcon, Search, Database, Copy, Check } from 'lucide-react';
 import { ALL_OFFERS } from '../lib/offersData';
 
 interface AdminDashboardProps {
-  allowedEmails: string;
-  onSave: (emails: string) => void;
   onNavigate: (view: any) => void;
   currentView: string;
   onLogout: () => void;
   trackingLinks: Record<number, string>;
   onSaveTrackingLinks: (links: Record<number, string>) => void;
-  initialTab?: 'access' | 'links' | 'api';
+  initialTab?: 'links' | 'api';
 }
 
 export default function AdminDashboard({ 
-  allowedEmails, 
-  onSave, 
   onNavigate, 
   currentView, 
   onLogout,
   trackingLinks,
   onSaveTrackingLinks,
-  initialTab = 'access'
+  initialTab = 'links'
 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'access' | 'links' | 'api'>(initialTab as any || 'access');
-  const [emailText, setEmailText] = useState(allowedEmails);
+  const [activeTab, setActiveTab] = useState<'links' | 'api'>(initialTab as any || 'links');
   const [localLinks, setLocalLinks] = useState(trackingLinks);
   const [isSaved, setIsSaved] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,11 +42,7 @@ export default function AdminDashboard({
   }, [initialTab]);
 
   const handleSave = () => {
-    if (activeTab === 'access') {
-      onSave(emailText);
-    } else {
-      onSaveTrackingLinks(localLinks);
-    }
+    onSaveTrackingLinks(localLinks);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };
@@ -73,14 +64,6 @@ export default function AdminDashboard({
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setActiveTab('access')}
-                className={`text-2xl font-bold flex items-center gap-2 transition-colors ${activeTab === 'access' ? 'text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                <Users className={activeTab === 'access' ? 'text-indigo-500' : 'text-slate-400'} />
-                Access Control
-              </button>
-              <div className="h-8 w-px bg-gray-200" />
               <button 
                 onClick={() => setActiveTab('links')}
                 className={`text-2xl font-bold flex items-center gap-2 transition-colors ${activeTab === 'links' ? 'text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
@@ -119,33 +102,7 @@ export default function AdminDashboard({
             </div>
           </div>
 
-          {activeTab === 'access' ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-              <div className="mb-6">
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  Allowed Email List
-                </label>
-                <p className="text-sm text-slate-500 mb-4">
-                  Enter the email addresses that are permitted to register and log in. 
-                  Separate multiple emails with commas or new lines.
-                </p>
-                <textarea
-                  value={emailText}
-                  onChange={(e) => setEmailText(e.target.value)}
-                  placeholder="example1@qq.com&#10;example2@gmail.com"
-                  className="w-full h-64 p-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none font-mono text-sm leading-relaxed"
-                />
-              </div>
-
-              <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 flex gap-3">
-                <AlertCircle className="text-amber-500 shrink-0" />
-                <p className="text-sm text-amber-700">
-                  <strong>Important:</strong> Only users with emails listed above will be able to access the platform. 
-                  If a user tries to register with an unlisted email, they will see a "Not Authorized" prompt.
-                </p>
-              </div>
-            </div>
-          ) : activeTab === 'links' ? (
+          {activeTab === 'links' ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-100 bg-gray-50/50">
                 <div className="flex items-center justify-between gap-4">
