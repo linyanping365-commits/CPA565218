@@ -33,7 +33,7 @@ function StatCard({ title, approved, pending, gradient }: { title: string, appro
   );
 }
 
-function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout, balance, withdrawals }: { onNavigate: (view: any) => void, currentView: string, isAdmin: boolean, userEmail: string, onLogout: () => void, balance: number, withdrawals: any[] }) {
+function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout, balance, withdrawals, clicks }: { onNavigate: (view: any) => void, currentView: string, isAdmin: boolean, userEmail: string, onLogout: () => void, balance: number, withdrawals: any[], clicks: any[] }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar onNavigate={onNavigate} currentView={currentView} isAdmin={isAdmin} onLogout={onLogout} />
@@ -44,7 +44,7 @@ function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout, bala
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <StatCard 
             title="Today" 
-            approved="$ 0.00" 
+            approved={`$ ${clicks.filter(c => c.timestamp.startsWith(new Date().toISOString().split('T')[0])).reduce((acc, c) => acc + parseFloat(c.payout), 0).toFixed(2)}`}
             pending="$ 0.00" 
             gradient="from-blue-500 to-cyan-400" 
           />
@@ -56,7 +56,7 @@ function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout, bala
           />
           <StatCard 
             title="Month" 
-            approved="$ 0.00" 
+            approved={`$ ${clicks.reduce((acc, c) => acc + parseFloat(c.payout), 0).toFixed(2)}`}
             pending="$ 0.00" 
             gradient="from-purple-500 to-indigo-400" 
           />
@@ -72,12 +72,61 @@ function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout, bala
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 gap-6">
-          {/* Chart Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Chart & Task Activity */}
           <div className="space-y-6">
             <SummaryChart />
             
-            {/* Recent Withdrawals Table */}
+            {/* Recent Task Activity Table */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-4 border-b border-gray-50 flex items-center justify-between">
+                <h3 className="font-bold text-slate-800">Recent Task Activity</h3>
+                <button 
+                  onClick={() => onNavigate('clicks')}
+                  className="text-xs text-indigo-600 font-bold hover:underline"
+                >
+                  View All
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-gray-50/50">
+                      <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Time</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Task</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Payout</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {clicks.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-8 text-center text-gray-400 text-xs">
+                          No recent activity
+                        </td>
+                      </tr>
+                    ) : (
+                      clicks.slice(0, 5).map((c) => (
+                        <tr key={c.id} className="hover:bg-gray-50/30 transition-colors">
+                          <td className="px-4 py-3 text-[10px] text-slate-500 font-mono">
+                            {c.timestamp.split(' ')[1]}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-600 truncate max-w-[150px]">
+                            {c.taskInfo || 'External Task'}
+                          </td>
+                          <td className="px-4 py-3 text-xs font-bold text-green-600">
+                            +${parseFloat(c.payout).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Recent Withdrawals */}
+          <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 border-b border-gray-50 flex items-center justify-between">
                 <h3 className="font-bold text-slate-800">Recent Withdrawals</h3>
@@ -292,5 +341,5 @@ export default function App() {
     );
   }
 
-  return <Dashboard onNavigate={(v) => setView(v)} currentView={view} isAdmin={isAdmin} userEmail={userEmail} onLogout={handleLogout} balance={balance} withdrawals={withdrawals} />;
+  return <Dashboard onNavigate={(v) => setView(v)} currentView={view} isAdmin={isAdmin} userEmail={userEmail} onLogout={handleLogout} balance={balance} withdrawals={withdrawals} clicks={clicks} />;
 }
