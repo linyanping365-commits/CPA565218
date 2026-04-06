@@ -4,7 +4,7 @@ export interface Offer {
   title: string;
   payout: string;
   countries: string[];
-  status: 'Available';
+  status: 'Available' | 'APPROVAL';
   createdAt: string;
   updatedAt: string;
 }
@@ -14,13 +14,13 @@ const formatDate = (date: Date) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 };
 
-const generateRandomDates = () => {
+const generateRandomDates = (seed: number) => {
   const start = new Date('2025-10-01T00:00:00').getTime();
   const end = new Date('2026-04-05T00:00:00').getTime();
-  const creationTime = new Date(start + Math.random() * (end - start));
+  const creationTime = new Date(start + seededRandom(seed) * (end - start));
   
   const maxInterval = 5 * 24 * 60 * 60 * 1000;
-  const updateTime = new Date(Math.min(creationTime.getTime() + Math.random() * maxInterval, end));
+  const updateTime = new Date(Math.min(creationTime.getTime() + seededRandom(seed + 1) * maxInterval, end));
   
   return {
     createdAt: formatDate(creationTime),
@@ -28,22 +28,35 @@ const generateRandomDates = () => {
   };
 };
 
+// Simple seeded random generator for deterministic shuffling
+const seededRandom = (seed: number) => {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+};
+
 const generateOffers = (): Offer[] => {
-  const lowPayoutOffers: Offer[] = [];
-  const highPayoutOffers: Offer[] = [];
+  const allOffers: Offer[] = [];
+  const totalCount = 2040; // 60 low + 1980 high
   
-  // 60 offers between $10 and $15 - FIXED SERIALS 1001-1060
+  // Create a pool of IDs from 1001 to 3040
+  const idPool = Array.from({ length: totalCount }, (_, i) => 1001 + i);
+  
+  // Deterministically shuffle the ID pool using a fixed seed (e.g., 42)
+  for (let i = idPool.length - 1; i > 0; i--) {
+    const j = Math.floor(seededRandom(i + 42) * (i + 1));
+    [idPool[i], idPool[j]] = [idPool[j], idPool[i]];
+  }
+
+  // 60 offers between $10 and $15
   for (let i = 1; i <= 60; i++) {
-    // Use a deterministic formula for price instead of Math.random()
-    // This ensures the price is always the same for the same offer index
     const basePrice = 10.25;
     const increment = (i * 0.73) % 4.50;
     const price = (basePrice + increment).toFixed(2);
     
-    const dates = generateRandomDates();
-    lowPayoutOffers.push({
+    const dates = generateRandomDates(i * 10);
+    allOffers.push({
       id: `low-${i}`,
-      serialNumber: 1000 + i, // Permanent fixed number
+      serialNumber: idPool[i - 1], // Use shuffled ID
       title: `(Web/Wap) #L${i} V2 (Biweekly) - Premium Offer - US/UK/CA - CC Submit`,
       payout: `$${price}`,
       countries: ['us', 'gb', 'ca'],
@@ -54,25 +67,23 @@ const generateOffers = (): Offer[] => {
 
   // 1980 offers between $16 and $40
   for (let i = 1; i <= 1980; i++) {
-    const price = (Math.random() * 24 + 16).toFixed(2);
-    const dates = generateRandomDates();
-    highPayoutOffers.push({
+    // Use seeded random for prices too to keep them fixed
+    const price = (seededRandom(i + 100) * 24 + 16).toFixed(2);
+    const dates = generateRandomDates(i * 20 + 5000);
+    allOffers.push({
       id: `high-${i}`,
-      serialNumber: 1060 + i,
+      serialNumber: idPool[60 + i - 1], // Use shuffled ID
       title: `(Web/Wap) #H${i} V2 (Biweekly) - High Value Campaign - Global - CC Submit`,
       payout: `$${price}`,
       countries: ['us', 'kr', 'tw', 'hk'],
-      status: 'Available',
+      status: 'APPROVAL',
       ...dates
     });
   }
 
-  const allOffers = [...lowPayoutOffers, ...highPayoutOffers];
-
-  // Shuffle the combined list so they appear in random order, 
-  // but their serialNumber is already fixed.
+  // Deterministically shuffle the final array order so they appear in random but fixed order
   for (let i = allOffers.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(seededRandom(i + 999) * (i + 1));
     [allOffers[i], allOffers[j]] = [allOffers[j], allOffers[i]];
   }
 

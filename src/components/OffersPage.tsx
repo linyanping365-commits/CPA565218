@@ -370,8 +370,8 @@ export default function OffersPage({ onNavigate, currentView, isAdmin, userEmail
               return (
                 <div key={offer.id} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden flex flex-col group hover:shadow-md transition-shadow">
                   <div className="relative aspect-square bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center p-4">
-                    <div className="absolute top-0 right-0 bg-slate-800 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold">
-                      Available
+                    <div className={`absolute top-0 right-0 ${offer.status === 'APPROVAL' ? 'bg-red-600' : 'bg-slate-800'} text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold`}>
+                      {offer.status}
                     </div>
                     
                     {/* Mock "BEST OFFER" Graphic */}
@@ -492,7 +492,7 @@ export default function OffersPage({ onNavigate, currentView, isAdmin, userEmail
                     <DetailRow label="Offer ID" value={selectedOffer.serialNumber.toString()} />
                     <DetailRow label="Name" value={selectedOffer.title} />
                     <DetailRow label="Payout to Affiliate" value={selectedOffer.payout} />
-                    <DetailRow label="Status" value={<span className="bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">ACTIVE</span>} />
+                    <DetailRow label="Status" value={<span className={`${selectedOffer.status === 'APPROVAL' ? 'bg-red-600' : 'bg-green-500'} text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase`}>{selectedOffer.status === 'APPROVAL' ? 'APPROVAL' : 'ACTIVE'}</span>} />
                     <DetailRow label="Offer Type" value={<span className="bg-indigo-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">CPA</span>} />
                     <DetailRow label="Allowed Countries" value={
                       <div className="flex gap-1">
