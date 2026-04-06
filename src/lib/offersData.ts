@@ -34,7 +34,12 @@ const generateOffers = (): Offer[] => {
   
   // 60 offers between $10 and $15 - FIXED SERIALS 1001-1060
   for (let i = 1; i <= 60; i++) {
-    const price = (Math.random() * 5 + 10).toFixed(2);
+    // Use a deterministic formula for price instead of Math.random()
+    // This ensures the price is always the same for the same offer index
+    const basePrice = 10.25;
+    const increment = (i * 0.73) % 4.50;
+    const price = (basePrice + increment).toFixed(2);
+    
     const dates = generateRandomDates();
     lowPayoutOffers.push({
       id: `low-${i}`,
