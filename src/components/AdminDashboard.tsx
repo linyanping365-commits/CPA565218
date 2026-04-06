@@ -350,8 +350,21 @@ export default function AdminDashboard({
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-                <h2 className="text-lg font-bold text-slate-800">User Dashboard Management</h2>
-                <p className="text-sm text-slate-500">Modify balance and data for registered users.</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800">User Dashboard Management</h2>
+                    <p className="text-sm text-slate-500">Modify balance and data for registered users.</p>
+                  </div>
+                  <button 
+                    onClick={fetchUsers}
+                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2 text-sm font-bold"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh List
+                  </button>
+                </div>
               </div>
               
               <div className="overflow-x-auto">

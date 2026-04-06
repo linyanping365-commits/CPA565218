@@ -3,25 +3,43 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
+import fs from "fs";
 import { ALL_OFFERS } from "./src/lib/offersData.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const DATA_FILE = path.join(__dirname, "user_data.json");
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(cors());
-  // In-memory user data store (for demo purposes)
-  // Key: userEmail, Value: { balance: number, pendingBalance: number, totalEarned: number, totalWithdrawals: number, clicks: any[] }
-  const userStore = new Map<string, { 
-    balance: number, 
-    pendingBalance: number, 
-    totalEarned: number, 
-    totalWithdrawals: number, 
-    clicks: any[] 
-  }>();
+  
+  // Load initial data from file if it exists
+  let initialData = {};
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const content = fs.readFileSync(DATA_FILE, "utf-8");
+      initialData = JSON.parse(content);
+      console.log("Loaded user data from file.");
+    }
+  } catch (e) {
+    console.error("Failed to load user data:", e);
+  }
+
+  // In-memory user data store
+  const userStore = new Map<string, any>(Object.entries(initialData));
+  
+  const saveUserData = () => {
+    try {
+      const data = Object.fromEntries(userStore);
+      fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+      console.error("Failed to save user data:", e);
+    }
+  };
+
   // To track processed transaction IDs (idempotency)
   const processedTransactions = new Set<string>();
 
@@ -34,6 +52,7 @@ async function startServer() {
         totalWithdrawals: 0, 
         clicks: [] 
       });
+      saveUserData();
     }
     return userStore.get(email)!;
   };
@@ -114,6 +133,7 @@ async function startServer() {
 
     // Mark transaction as processed
     processedTransactions.add(transactionId);
+    saveUserData();
 
     console.log(`[Webhook] Task completed for ${userId}: +$${amount}. New balance: $${userData.balance}`);
     
@@ -167,6 +187,8 @@ async function startServer() {
     if (typeof totalWithdrawals === 'number') userData.totalWithdrawals = totalWithdrawals;
     if (Array.isArray(clicks)) userData.clicks = clicks;
 
+    saveUserData();
+
     res.json({ 
       success: true, 
       email, 
@@ -204,11 +226,22 @@ async function startServer() {
     });
     if (userData.clicks.length > 100) userData.clicks.pop();
 
+    saveUserData();
+
     res.json({ 
       success: true, 
       balance: userData.balance,
       totalWithdrawals: userData.totalWithdrawals
     });
+  });
+
+  // API to explicitly register/ping a user
+  app.post("/api/register", (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required" });
+    
+    const userData = getUserData(email);
+    res.json({ success: true, email: email, isNew: !userStore.has(email) });
   });
 
   // Vite middleware for development

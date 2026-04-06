@@ -31,6 +31,13 @@ export default function LoginPage({ onLogin, onSwitchToRegister }: LoginPageProp
       return;
     }
 
+    // Ensure user is in backend store
+    fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizedEmail })
+    }).catch(err => console.error('Backend ping failed:', err));
+
     onLogin(normalizedEmail);
   };
 

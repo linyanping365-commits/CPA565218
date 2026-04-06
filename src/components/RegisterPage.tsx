@@ -29,6 +29,13 @@ export default function RegisterPage({ onSwitchToLogin }: RegisterPageProps) {
       return;
     }
 
+    // Notify backend
+    fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizedEmail })
+    }).catch(err => console.error('Backend registration failed:', err));
+
     registeredUsers.push(normalizedEmail);
     localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
     
