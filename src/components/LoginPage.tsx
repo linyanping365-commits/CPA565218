@@ -8,8 +8,8 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin, onSwitchToRegister }: LoginPageProps) {
-  const [email, setEmail] = useState('565218@qq.com');
-  const [password, setPassword] = useState('565218@qq.com');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -19,6 +19,13 @@ export default function LoginPage({ onLogin, onSwitchToRegister }: LoginPageProp
     
     if (normalizedPassword !== normalizedEmail) {
       setError('Password must be the same as your email address.');
+      return;
+    }
+
+    // Real login logic using localStorage
+    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+    if (!registeredUsers.includes(normalizedEmail)) {
+      setError('This email is not registered. Please register first.');
       return;
     }
 

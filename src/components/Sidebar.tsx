@@ -15,8 +15,7 @@ export default function Sidebar({ onNavigate, currentView, isAdmin, onLogout }: 
     { icon: Wallet, id: 'wallet', label: 'Wallet' },
     ...(isAdmin ? [
       { icon: Settings2, id: 'admin', label: 'Admin' },
-      { icon: LinkIcon, id: 'link-management', label: 'Link Management' },
-      { icon: Database, id: 'api-access', label: 'API Access' }
+      { icon: LinkIcon, id: 'link-management', label: 'Link Management' }
     ] : []),
     { icon: Bell, id: 'bell', label: 'Notifications' },
   ];

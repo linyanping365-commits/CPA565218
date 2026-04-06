@@ -33,58 +33,6 @@ function StatCard({ title, approved, pending, gradient }: { title: string, appro
   );
 }
 
-function ProfileCard({ 
-  gradient, 
-  title, 
-  email, 
-  role, 
-  extra, 
-  isManager = false 
-}: { 
-  gradient: string, 
-  title?: string, 
-  email: string, 
-  role?: string, 
-  extra?: string,
-  isManager?: boolean
-}) {
-  return (
-    <div className={`rounded-xl p-8 text-white flex flex-col items-center justify-center space-y-4 bg-gradient-to-br ${gradient} shadow-lg relative overflow-hidden`}>
-      <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center border-4 border-white/30 backdrop-blur-sm">
-        <div className="text-white/50 text-4xl font-bold">?</div>
-      </div>
-      
-      <div className="text-center">
-        {isManager && <h3 className="text-2xl font-bold mb-1">Manager</h3>}
-        <div className="text-lg font-medium opacity-90">{title || email}</div>
-        {role && (
-          <div className="flex items-center justify-center space-x-1 mt-1">
-            <User size={14} className="opacity-80" />
-            <span className="text-xs font-bold uppercase tracking-wider">{role}</span>
-          </div>
-        )}
-        {extra && (
-          <div className="flex items-center justify-center space-x-1 mt-1 opacity-80">
-            <span className="text-xs font-medium">🚫 {extra}</span>
-          </div>
-        )}
-        {isManager && (
-          <div className="mt-4 space-y-1">
-            <div className="flex items-center justify-center space-x-2 text-sm opacity-90">
-              <Mail size={14} />
-              <span>verenbariel@hotmail.com</span>
-            </div>
-            <div className="flex items-center justify-center space-x-2 text-sm opacity-90">
-              <MessageSquare size={14} />
-              <span>live：cid.83138053aee</span>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout, balance, withdrawals }: { onNavigate: (view: any) => void, currentView: string, isAdmin: boolean, userEmail: string, onLogout: () => void, balance: number, withdrawals: any[] }) {
   return (
     <div className="min-h-screen bg-gray-50">
@@ -124,9 +72,9 @@ function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout, bala
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {/* Chart Section */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="space-y-6">
             <SummaryChart />
             
             {/* Recent Withdrawals Table */}
@@ -182,22 +130,6 @@ function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout, bala
               </div>
             </div>
           </div>
-
-          {/* Profile Section */}
-          <div className="flex flex-col space-y-6">
-            <ProfileCard 
-              gradient="from-blue-600 to-cyan-400" 
-              email={userEmail} 
-              role="publisher" 
-              extra="Not Mentioned"
-            />
-            <ProfileCard 
-              gradient="from-indigo-500 to-pink-400" 
-              title="erqiang"
-              email="verenbariel@hotmail.com"
-              isManager={true}
-            />
-          </div>
         </div>
       </main>
     </div>
@@ -213,7 +145,7 @@ interface Withdrawal {
 }
 
 export default function App() {
-  const [view, setView] = useState<'login' | 'register' | 'dashboard' | 'admin' | 'all-offers' | 'link-management' | 'api-access' | 'settings' | 'wallet' | 'bell' | 'clicks'>('login');
+  const [view, setView] = useState<'login' | 'register' | 'dashboard' | 'admin' | 'all-offers' | 'link-management' | 'settings' | 'wallet' | 'bell' | 'clicks'>('login');
   const [userEmail, setUserEmail] = useState('');
   const [balance, setBalance] = useState(0); // Initial mock balance
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -221,17 +153,19 @@ export default function App() {
 
   // Poll for balance and clicks updates from server
   useEffect(() => {
+    if (!userEmail) return;
+
     const fetchData = async () => {
       try {
         // Fetch balance
-        const balanceRes = await fetch('/api/balance');
+        const balanceRes = await fetch(`/api/balance?email=${encodeURIComponent(userEmail)}`);
         const balanceData = await balanceRes.json();
         if (balanceData && typeof balanceData.balance === 'number') {
           setBalance(balanceData.balance);
         }
 
         // Fetch clicks
-        const clicksRes = await fetch('/api/clicks');
+        const clicksRes = await fetch(`/api/clicks?email=${encodeURIComponent(userEmail)}`);
         const clicksData = await clicksRes.json();
         if (Array.isArray(clicksData)) {
           setClicks(clicksData);
@@ -282,7 +216,7 @@ export default function App() {
     );
   }
 
-  if (view === 'admin' || view === 'link-management' || view === 'api-access') {
+  if (view === 'admin' || view === 'link-management') {
     return (
       <AdminDashboard 
         onNavigate={(v) => setView(v)}
@@ -290,7 +224,7 @@ export default function App() {
         onLogout={handleLogout}
         trackingLinks={trackingLinks}
         onSaveTrackingLinks={handleSaveTrackingLinks}
-        initialTab={view === 'link-management' ? 'links' : view === 'api-access' ? 'api' : 'links'}
+        initialTab={view === 'link-management' ? 'links' : 'links'}
       />
     );
   }

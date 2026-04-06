@@ -22,7 +22,16 @@ export default function RegisterPage({ onSwitchToLogin }: RegisterPageProps) {
       return;
     }
 
-    // Simulate registration logic
+    // Real registration logic using localStorage
+    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+    if (registeredUsers.includes(normalizedEmail)) {
+      setError('This email is already registered.');
+      return;
+    }
+
+    registeredUsers.push(normalizedEmail);
+    localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
+    
     setIsSuccess(true);
   };
 
