@@ -33,6 +33,7 @@ export default function AdminDashboard({
   
   // User Management States
   const [users, setUsers] = useState<any[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [viewingHistory, setViewingHistory] = useState<any>(null);
   const [userClicks, setUserClicks] = useState<any[]>([]);
@@ -71,12 +72,15 @@ export default function AdminDashboard({
   }, [newTaskOfferId, lastProcessedOfferId]);
 
   const fetchUsers = async () => {
+    setIsLoadingUsers(true);
     try {
       const res = await fetch('/api/admin/users');
       const data = await res.json();
       setUsers(data);
     } catch (e) {
       console.error('Failed to fetch users:', e);
+    } finally {
+      setIsLoadingUsers(false);
     }
   };
 
@@ -380,59 +384,69 @@ export default function AdminDashboard({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {Array.isArray(users) && users.map(user => (
-                      <tr key={user.email} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                              {user.email?.[0]?.toUpperCase() || '?'}
-                            </div>
-                            <span className="text-sm font-medium text-slate-700">{user.email}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold text-slate-800">${(user.balance || 0).toFixed(2)}</span>
-                            <span className="text-[10px] text-amber-600 font-medium">Pending: ${(user.pendingBalance || 0).toFixed(2)}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm font-bold text-green-600">${(user.totalEarned || 0).toFixed(2)}</span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-slate-500">{user.clicksCount || 0}</td>
-                        <td className="px-6 py-4 text-xs text-slate-400 font-mono">{user.lastActivity || 'Never'}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col gap-2">
-                            <button 
-                              onClick={() => {
-                                setEditingUser(user);
-                                setEditBalance((user.balance || 0).toString());
-                                setEditPendingBalance((user.pendingBalance || 0).toString());
-                                setEditTotalEarned((user.totalEarned || 0).toString());
-                                setEditTotalWithdrawals((user.totalWithdrawals || 0).toString());
-                                // Reset task fields for new edit session
-                                setNewTaskOfferId('');
-                                setNewTaskAmount('0.00');
-                                setNewTaskName('对应的编号记录');
-                                setLastProcessedOfferId(null);
-                              }}
-                              className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-xs font-bold"
-                            >
-                              <Edit2 size={14} /> Edit Data
-                            </button>
-                            <button 
-                              onClick={() => fetchUserClicks(user.email)}
-                              className="text-slate-500 hover:text-slate-700 flex items-center gap-1 text-xs font-bold"
-                            >
-                              <Clock size={14} /> View History
-                            </button>
+                    {isLoadingUsers ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center">
+                          <div className="flex items-center justify-center gap-2 text-indigo-600">
+                            <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                            <span className="text-sm font-medium">Fetching users...</span>
                           </div>
                         </td>
                       </tr>
-                    ))}
-                    {users.length === 0 && (
+                    ) : Array.isArray(users) && users.length > 0 ? (
+                      users.map(user => (
+                        <tr key={user.email} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                                {user.email?.[0]?.toUpperCase() || '?'}
+                              </div>
+                              <span className="text-sm font-medium text-slate-700">{user.email}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-slate-800">${(user.balance || 0).toFixed(2)}</span>
+                              <span className="text-[10px] text-amber-600 font-medium">Pending: ${(user.pendingBalance || 0).toFixed(2)}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm font-bold text-green-600">${(user.totalEarned || 0).toFixed(2)}</span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-500">{user.clicksCount || 0}</td>
+                          <td className="px-6 py-4 text-xs text-slate-400 font-mono">{user.lastActivity || 'Never'}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-2">
+                              <button 
+                                onClick={() => {
+                                  setEditingUser(user);
+                                  setEditBalance((user.balance || 0).toString());
+                                  setEditPendingBalance((user.pendingBalance || 0).toString());
+                                  setEditTotalEarned((user.totalEarned || 0).toString());
+                                  setEditTotalWithdrawals((user.totalWithdrawals || 0).toString());
+                                  // Reset task fields for new edit session
+                                  setNewTaskOfferId('');
+                                  setNewTaskAmount('0.00');
+                                  setNewTaskName('对应的编号记录');
+                                  setLastProcessedOfferId(null);
+                                }}
+                                className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-xs font-bold"
+                              >
+                                <Edit2 size={14} /> Edit Data
+                              </button>
+                              <button 
+                                onClick={() => fetchUserClicks(user.email)}
+                                className="text-slate-500 hover:text-slate-700 flex items-center gap-1 text-xs font-bold"
+                              >
+                                <Clock size={14} /> View History
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic">
+                        <td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">
                           No users found. Users appear here after they log in once.
                         </td>
                       </tr>

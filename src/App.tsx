@@ -176,7 +176,7 @@ export default function App() {
         userEmail={userEmail}
         trackingLinks={trackingLinks}
         onSaveTrackingLinks={handleSaveTrackingLinks}
-        initialTab={view === 'link-management' ? 'links' : 'links'}
+        initialTab={view === 'admin' ? 'users' : 'links'}
       />
     );
   }

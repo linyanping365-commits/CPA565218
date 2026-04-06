@@ -147,6 +147,7 @@ async function startServer() {
 
   // Admin API to list all users
   app.get("/api/admin/users", (req, res) => {
+    console.log(`[Admin] Fetching users. Current store size: ${userStore.size}`);
     const users = Array.from(userStore.entries()).map(([email, data]) => ({
       email,
       balance: data.balance,
@@ -156,6 +157,7 @@ async function startServer() {
       clicksCount: data.clicks.length,
       lastActivity: data.clicks[0]?.timestamp || 'Never'
     }));
+    console.log(`[Admin] Returning ${users.length} users.`);
     res.json(users);
   });
 
