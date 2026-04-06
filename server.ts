@@ -177,6 +177,40 @@ async function startServer() {
     });
   });
 
+  // API to handle user withdrawals
+  app.post("/api/withdraw", (req, res) => {
+    const { email, amount } = req.body;
+    if (!email || typeof amount !== 'number') {
+      return res.status(400).json({ error: "Email and valid amount required" });
+    }
+
+    const userData = getUserData(email);
+    if (userData.balance < amount) {
+      return res.status(400).json({ error: "Insufficient balance" });
+    }
+
+    userData.balance -= amount;
+    userData.totalWithdrawals += amount;
+
+    // Add a record for the withdrawal in clicks history
+    const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
+    userData.clicks.unshift({
+      id: `WITHDRAW_${Date.now()}`,
+      payout: (-amount).toFixed(2),
+      status: 'Pending',
+      timestamp,
+      taskInfo: 'Withdrawal Request',
+      type: 'Withdrawal'
+    });
+    if (userData.clicks.length > 100) userData.clicks.pop();
+
+    res.json({ 
+      success: true, 
+      balance: userData.balance,
+      totalWithdrawals: userData.totalWithdrawals
+    });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

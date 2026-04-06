@@ -50,7 +50,7 @@ function Dashboard({ onNavigate, currentView, isAdmin, userEmail, onLogout, bala
           />
           <StatCard 
             title="Today" 
-            approved={`$ ${clicks.filter(c => c.timestamp.startsWith(new Date().toISOString().split('T')[0])).reduce((acc, c) => acc + parseFloat(c.payout), 0).toFixed(2)}`}
+            approved={`$ ${clicks.filter(c => c.timestamp.startsWith(new Date().toISOString().split('T')[0]) && c.type !== 'Withdrawal').reduce((acc, c) => acc + parseFloat(c.payout), 0).toFixed(2)}`}
             pending="$ 0.00" 
             gradient="from-purple-500 to-indigo-400" 
           />
@@ -212,6 +212,7 @@ export default function App() {
         onNavigate={setView} 
         currentView={view} 
         isAdmin={isAdmin} 
+        userEmail={userEmail}
         onLogout={handleLogout} 
         balance={balanceData.balance}
         onUpdateBalance={(newBalance) => setBalanceData(prev => ({ ...prev, balance: newBalance }))}

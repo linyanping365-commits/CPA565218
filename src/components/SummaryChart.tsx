@@ -10,6 +10,7 @@ export default function SummaryChart({ clicks = [] }: { clicks?: any[] }) {
     // Filter clicks for this hour today
     const hourClicks = clicks.filter(c => {
       if (!c.timestamp.startsWith(today)) return false;
+      if (c.type === 'Withdrawal') return false;
       const clickHour = parseInt(c.timestamp.split(' ')[1].split(':')[0]);
       return clickHour === hour;
     });
@@ -26,15 +27,15 @@ export default function SummaryChart({ clicks = [] }: { clicks?: any[] }) {
   });
 
   const totalPayout = clicks
-    .filter(c => c.timestamp.startsWith(today))
+    .filter(c => c.timestamp.startsWith(today) && c.type !== 'Withdrawal')
     .reduce((acc, c) => acc + parseFloat(c.payout), 0);
   
   const totalConversions = clicks
-    .filter(c => c.timestamp.startsWith(today) && c.status === 'Success')
+    .filter(c => c.timestamp.startsWith(today) && c.status === 'Success' && c.type !== 'Withdrawal')
     .length;
     
   const totalClicks = clicks
-    .filter(c => c.timestamp.startsWith(today))
+    .filter(c => c.timestamp.startsWith(today) && c.type !== 'Withdrawal')
     .length;
 
   return (

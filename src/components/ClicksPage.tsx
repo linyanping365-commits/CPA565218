@@ -6,7 +6,7 @@ import { MousePointerClick, CheckCircle2, XCircle, Clock } from 'lucide-react';
 interface ClickEntry {
   id: string;
   payout: string;
-  status: 'Success' | 'Failed';
+  status: 'Success' | 'Failed' | 'Pending';
   timestamp: string;
   taskInfo?: string;
   raw: any;
@@ -61,7 +61,9 @@ export default function ClicksPage({ onNavigate, currentView, isAdmin, onLogout,
                           <span className="text-sm text-slate-700 font-medium">{click.taskInfo || 'External Task'}</span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-sm font-bold text-slate-800">${parseFloat(click.payout).toFixed(2)}</span>
+                          <span className={`text-sm font-bold ${parseFloat(click.payout) < 0 ? 'text-red-600' : 'text-slate-800'}`}>
+                            ${parseFloat(click.payout).toFixed(2)}
+                          </span>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
@@ -69,6 +71,11 @@ export default function ClicksPage({ onNavigate, currentView, isAdmin, onLogout,
                               <>
                                 <CheckCircle2 size={16} className="text-green-500" />
                                 <span className="text-xs font-bold text-green-600 uppercase">Success</span>
+                              </>
+                            ) : click.status === 'Pending' ? (
+                              <>
+                                <Clock size={16} className="text-amber-500" />
+                                <span className="text-xs font-bold text-amber-600 uppercase">Pending</span>
                               </>
                             ) : (
                               <>

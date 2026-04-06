@@ -6,13 +6,14 @@ interface WalletPageProps {
   onNavigate: (view: any) => void;
   currentView: string;
   isAdmin: boolean;
+  userEmail: string;
   onLogout: () => void;
   balance: number;
   onUpdateBalance: (balance: number) => void;
   onAddWithdrawal: (withdrawal: any) => void;
 }
 
-export default function WalletPage({ onNavigate, currentView, isAdmin, onLogout, balance, onUpdateBalance, onAddWithdrawal }: WalletPageProps) {
+export default function WalletPage({ onNavigate, currentView, isAdmin, userEmail, onLogout, balance, onUpdateBalance, onAddWithdrawal }: WalletPageProps) {
   const [paymentMethod, setPaymentMethod] = useState('Paypal');
   const [paypalEmail, setPaypalEmail] = useState('');
   const [threshold, setThreshold] = useState('100');
@@ -37,7 +38,7 @@ export default function WalletPage({ onNavigate, currentView, isAdmin, onLogout,
     setTimeout(() => setIsSaved(false), 2000);
   };
 
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
     if (!paypalEmail) {
       setError('Please enter your Paypal account email');
       setTimeout(() => setError(null), 3000);
@@ -61,21 +62,37 @@ export default function WalletPage({ onNavigate, currentView, isAdmin, onLogout,
     }
 
     setIsWithdrawing(true);
-    setTimeout(() => {
-      const newWithdrawal = {
-        id: Math.random().toString(36).substr(2, 9).toUpperCase(),
-        amount: amount,
-        paypalEmail: paypalEmail,
-        date: new Date().toISOString(),
-        status: 'Pending'
-      };
-      onUpdateBalance(balance - amount);
-      onAddWithdrawal(newWithdrawal);
+    try {
+      const res = await fetch('/api/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail, amount })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        const newWithdrawal = {
+          id: Math.random().toString(36).substr(2, 9).toUpperCase(),
+          amount: amount,
+          paypalEmail: paypalEmail,
+          date: new Date().toISOString(),
+          status: 'Pending'
+        };
+        onUpdateBalance(data.balance);
+        onAddWithdrawal(newWithdrawal);
+        setWithdrawSuccess(true);
+        setWithdrawAmount('');
+        setTimeout(() => setWithdrawSuccess(false), 3000);
+      } else {
+        setError(data.error || 'Withdrawal failed');
+        setTimeout(() => setError(null), 3000);
+      }
+    } catch (e) {
+      setError('Connection error. Please try again.');
+      setTimeout(() => setError(null), 3000);
+    } finally {
       setIsWithdrawing(false);
-      setWithdrawSuccess(true);
-      setWithdrawAmount('');
-      setTimeout(() => setWithdrawSuccess(false), 3000);
-    }, 1500);
+    }
   };
 
   return (
