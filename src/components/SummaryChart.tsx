@@ -9,9 +9,13 @@ export default function SummaryChart({ clicks = [] }: { clicks?: any[] }) {
     
     // Filter clicks for this hour today
     const hourClicks = clicks.filter(c => {
-      if (!c.timestamp.startsWith(today)) return false;
+      if (!c.timestamp || !c.timestamp.startsWith(today)) return false;
       if (c.type === 'Withdrawal') return false;
-      const clickHour = parseInt(c.timestamp.split(' ')[1].split(':')[0]);
+      
+      const timePart = c.timestamp.includes('T') ? c.timestamp.split('T')[1] : c.timestamp.split(' ')[1];
+      if (!timePart) return false;
+      
+      const clickHour = parseInt(timePart.split(':')[0]);
       return clickHour === hour;
     });
 

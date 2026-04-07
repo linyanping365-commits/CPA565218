@@ -4,312 +4,284 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import Database from "better-sqlite3";
-import { ALL_OFFERS } from "./src/lib/offersData.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize SQLite Database
-const db = new Database(path.join(__dirname, "database.sqlite"));
+// Separate Databases
+const userDb = new Database(path.join(__dirname, "users.sqlite"));
+const taskDb = new Database(path.join(__dirname, "tasks.sqlite"));
 
-// Create tables if they don't exist
-db.exec(`
+// User Management Table
+userDb.exec(`
   CREATE TABLE IF NOT EXISTS users (
     email TEXT PRIMARY KEY,
+    password TEXT,
+    role TEXT DEFAULT 'user',
     balance REAL DEFAULT 0,
     pendingBalance REAL DEFAULT 0,
     totalEarned REAL DEFAULT 0,
     totalWithdrawals REAL DEFAULT 0,
-    clicks TEXT DEFAULT '[]'
+    clicks TEXT DEFAULT '[]',
+    withdrawals TEXT DEFAULT '[]'
   );
 `);
+
+// Task Management Tables
+taskDb.exec(`
+  CREATE TABLE IF NOT EXISTS pending_tasks (
+    id TEXT PRIMARY KEY,
+    email TEXT,
+    amount REAL,
+    taskInfo TEXT,
+    timestamp TEXT
+  );
+  CREATE TABLE IF NOT EXISTS processed_transactions (
+    id TEXT PRIMARY KEY
+  );
+`);
+
+// Insert default admins
+const adminEmail = "linyanping365@gmail.com";
+const adminExists = userDb.prepare("SELECT email FROM users WHERE email = ?").get(adminEmail);
+if (!adminExists) {
+  userDb.prepare(`
+    INSERT INTO users (email, password, role)
+    VALUES (?, ?, ?)
+  `).run(adminEmail, "admin123", "admin");
+}
+
+const secondAdminEmail = "890305@wty.com";
+const secondAdminExists = userDb.prepare("SELECT email FROM users WHERE email = ?").get(secondAdminEmail);
+if (!secondAdminExists) {
+  userDb.prepare(`
+    INSERT INTO users (email, password, role)
+    VALUES (?, ?, ?)
+  `).run(secondAdminEmail, "890305@wty.com", "admin");
+}
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(cors());
-  
-  // To track processed transaction IDs (idempotency)
-  const processedTransactions = new Set<string>();
+  app.use(express.json());
 
-  const getUserData = (email: string) => {
-    const stmt = db.prepare("SELECT * FROM users WHERE email = ?");
-    let user = stmt.get(email) as any;
-    
-    if (!user) {
-      const insertStmt = db.prepare(`
-        INSERT INTO users (email, balance, pendingBalance, totalEarned, totalWithdrawals, clicks)
-        VALUES (?, 0, 0, 0, 0, '[]')
-      `);
-      insertStmt.run(email);
-      user = {
-        email,
-        balance: 0,
-        pendingBalance: 0,
-        totalEarned: 0,
-        totalWithdrawals: 0,
-        clicks: '[]'
-      };
-    }
-    
-    // Parse clicks JSON
-    if (typeof user.clicks === 'string') {
-      try {
-        user.clicks = JSON.parse(user.clicks);
-      } catch (e) {
-        user.clicks = [];
+  // --- Auth Endpoints ---
+  app.post("/api/register", (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+
+    try {
+      userDb.prepare("INSERT INTO users (email, password) VALUES (?, ?)").run(email, password);
+      res.json({ success: true, email, role: 'user' });
+    } catch (e: any) {
+      if (e.code === 'SQLITE_CONSTRAINT_PRIMARYKEY') {
+        res.status(400).json({ error: "Email already registered" });
+      } else {
+        res.status(500).json({ error: "Registration failed" });
       }
     }
-    
-    return user;
-  };
-
-  const saveUserData = (email: string, data: any) => {
-    const stmt = db.prepare(`
-      UPDATE users 
-      SET balance = ?, pendingBalance = ?, totalEarned = ?, totalWithdrawals = ?, clicks = ?
-      WHERE email = ?
-    `);
-    stmt.run(
-      data.balance, 
-      data.pendingBalance, 
-      data.totalEarned, 
-      data.totalWithdrawals, 
-      JSON.stringify(data.clicks), 
-      email
-    );
-  };
-
-  // API routes
-  app.use(express.json()); // Enable JSON body parsing
-
-  app.get("/api/balance", (req, res) => {
-    const email = req.query.email as string;
-    if (!email) return res.status(400).json({ error: "Email is required" });
-    const userData = getUserData(email);
-    res.json({ 
-      balance: userData.balance,
-      pendingBalance: userData.pendingBalance,
-      totalEarned: userData.totalEarned,
-      totalWithdrawals: userData.totalWithdrawals
-    });
   });
 
-  app.get("/api/clicks", (req, res) => {
-    const email = req.query.email as string;
-    if (!email) return res.status(400).json({ error: "Email is required" });
-    const userData = getUserData(email);
-    res.json(userData.clicks);
+  app.post("/api/login", (req, res) => {
+    const { email, password } = req.body;
+    const user = userDb.prepare("SELECT * FROM users WHERE email = ? AND password = ?").get(email, password) as any;
+    
+    if (user) {
+      res.json({ success: true, email: user.email, role: user.role });
+    } else {
+      res.status(401).json({ error: "Invalid credentials" });
+    }
   });
 
-  // New API endpoint for Website A to notify Website B
-  app.post("/api/task-completed", (req, res) => {
-    const authHeader = req.headers.authorization;
-    const expectedToken = process.env.WEBHOOK_TOKEN || "your_secure_token_here";
-
-    console.log('Task Completed Request:', {
-      auth: authHeader,
-      body: req.body
-    });
-
-    // 1. Authentication check
-    if (!authHeader || authHeader !== `Bearer ${expectedToken}`) {
-      console.log('Auth failed:', { authHeader, expectedToken });
-      return res.status(401).json({ success: false, message: "Unauthorized" });
-    }
-
-    const { userId, taskInfo, earnings, transactionId } = req.body;
-
-    // 2. Validate required fields
-    if (!userId || earnings === undefined || !transactionId) {
-      console.log('Validation failed:', { userId, earnings, transactionId });
-      return res.status(400).json({ success: false, message: "Missing required fields: userId, earnings, transactionId" });
-    }
-
-    // 3. Idempotency check (prevent duplicate notifications)
-    if (processedTransactions.has(transactionId)) {
-      return res.status(200).json({ success: true, message: "Already processed", alreadyProcessed: true });
-    }
-
-    const amount = parseFloat(earnings);
-    if (isNaN(amount)) {
-      return res.status(400).json({ success: false, message: "Invalid earnings value" });
-    }
-
-    // 4. Update user data
-    const userData = getUserData(userId);
-    userData.balance += amount;
-    userData.totalEarned += amount;
-    
-    const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
-    const clickEntry = {
-      id: transactionId,
-      payout: amount.toFixed(2),
-      status: 'Success',
-      timestamp,
-      taskInfo: taskInfo || 'External Task',
-      type: 'Webhook'
-    };
-
-    userData.clicks.unshift(clickEntry);
-    if (userData.clicks.length > 100) userData.clicks.pop();
-
-    // Mark transaction as processed
-    processedTransactions.add(transactionId);
-    saveUserData(userId, userData);
-
-    console.log(`[Webhook] Task completed for ${userId}: +$${amount}. New balance: $${userData.balance}`);
-    
-    res.json({ 
-      success: true, 
-      message: "Balance updated successfully",
-      newBalance: userData.balance,
-      transactionId 
-    });
-  });
-
-  // Admin API to list all users
+  // --- Admin Endpoints ---
   app.get("/api/admin/users", (req, res) => {
-    const stmt = db.prepare("SELECT * FROM users");
-    const rows = stmt.all() as any[];
-    
-    const users = rows.map(row => {
-      let clicks = [];
-      try { clicks = JSON.parse(row.clicks); } catch(e) {}
-      return {
-        email: row.email,
-        balance: row.balance,
-        pendingBalance: row.pendingBalance,
-        totalEarned: row.totalEarned,
-        totalWithdrawals: row.totalWithdrawals,
-        clicksCount: clicks.length,
-        lastActivity: clicks[0]?.timestamp || 'Never'
-      };
-    });
-    
-    console.log(`[Admin] Returning ${users.length} users.`);
-    res.json(users);
+    const users = userDb.prepare("SELECT * FROM users").all() as any[];
+    const parsedUsers = users.map(u => ({
+      ...u,
+      clicks: JSON.parse(u.clicks),
+      withdrawals: JSON.parse(u.withdrawals)
+    }));
+    res.json(parsedUsers);
   });
 
-  // Admin API to add a new user
-  app.post("/api/admin/add-user", (req, res) => {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: "Email required" });
-
-    const stmt = db.prepare("SELECT email FROM users WHERE email = ?");
-    const exists = stmt.get(email);
-
-    if (exists) {
-      return res.status(400).json({ error: "User already exists" });
-    }
-
-    // getUserData creates the user if they don't exist
-    getUserData(email);
-    res.json({ success: true, message: "User added successfully" });
-  });
-
-  // Admin API to delete a user
-  app.post("/api/admin/delete-user", (req, res) => {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: "Email required" });
-
-    const stmt = db.prepare("DELETE FROM users WHERE email = ?");
-    const result = stmt.run(email);
-
-    if (result.changes > 0) {
-      res.json({ success: true, message: "User deleted successfully" });
+  app.get("/api/admin/users/:email", (req, res) => {
+    const user = userDb.prepare("SELECT * FROM users WHERE email = ?").get(req.params.email) as any;
+    if (user) {
+      res.json({
+        ...user,
+        clicks: JSON.parse(user.clicks),
+        withdrawals: JSON.parse(user.withdrawals)
+      });
     } else {
       res.status(404).json({ error: "User not found" });
     }
   });
 
-  // Admin API to update specific user data
-  app.post("/api/admin/update-user", (req, res) => {
-    const { email, balance, pendingBalance, totalEarned, totalWithdrawals, clicks, taskInfo } = req.body;
-    if (!email) return res.status(400).json({ error: "Email required" });
-
-    const userData = getUserData(email);
-    
-    // Check if balance is changing to add a sync record
-    if (typeof balance === 'number' && balance !== userData.balance) {
-      const diff = balance - userData.balance;
-      const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
-      userData.clicks.unshift({
-        id: `ADJ_${Date.now()}`,
-        payout: diff.toFixed(2),
-        status: 'Success',
-        timestamp,
-        taskInfo: taskInfo || (diff > 0 ? '对应的编号记录' : 'Manual Balance Adjustment (Debit)'),
-        type: 'Adjustment'
-      });
-      if (userData.clicks.length > 100) userData.clicks.pop();
+  app.post("/api/admin/users", (req, res) => {
+    const { email, password, role, balance, totalEarned } = req.body;
+    try {
+      userDb.prepare(`
+        INSERT INTO users (email, password, role, balance, totalEarned)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(email, password, role || 'user', balance || 0, totalEarned || 0);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(400).json({ error: "Failed to add user" });
     }
-
-    if (typeof balance === 'number') userData.balance = balance;
-    if (typeof pendingBalance === 'number') userData.pendingBalance = pendingBalance;
-    if (typeof totalEarned === 'number') userData.totalEarned = totalEarned;
-    if (typeof totalWithdrawals === 'number') userData.totalWithdrawals = totalWithdrawals;
-    if (Array.isArray(clicks)) userData.clicks = clicks;
-
-    saveUserData(email, userData);
-
-    res.json({ 
-      success: true, 
-      email, 
-      balance: userData.balance,
-      pendingBalance: userData.pendingBalance,
-      totalEarned: userData.totalEarned,
-      totalWithdrawals: userData.totalWithdrawals
-    });
   });
 
-  // API to handle user withdrawals
-  app.post("/api/withdraw", (req, res) => {
-    const { email, amount } = req.body;
-    if (!email || typeof amount !== 'number') {
-      return res.status(400).json({ error: "Email and valid amount required" });
+  app.put("/api/admin/users/:email", (req, res) => {
+    const { password, role, balance, pendingBalance, totalEarned, totalWithdrawals, clicks, withdrawals } = req.body;
+    const email = req.params.email;
+    
+    try {
+      const updates = [];
+      const values = [];
+      
+      if (password !== undefined) { updates.push("password = ?"); values.push(password); }
+      if (role !== undefined) { updates.push("role = ?"); values.push(role); }
+      if (balance !== undefined) { updates.push("balance = ?"); values.push(balance); }
+      if (pendingBalance !== undefined) { updates.push("pendingBalance = ?"); values.push(pendingBalance); }
+      if (totalEarned !== undefined) { updates.push("totalEarned = ?"); values.push(totalEarned); }
+      if (totalWithdrawals !== undefined) { updates.push("totalWithdrawals = ?"); values.push(totalWithdrawals); }
+      if (clicks !== undefined) { updates.push("clicks = ?"); values.push(JSON.stringify(clicks)); }
+      if (withdrawals !== undefined) { updates.push("withdrawals = ?"); values.push(JSON.stringify(withdrawals)); }
+      
+      if (updates.length > 0) {
+        values.push(email);
+        userDb.prepare(`UPDATE users SET ${updates.join(", ")} WHERE email = ?`).run(...values);
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(400).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/admin/users/:email", (req, res) => {
+    try {
+      userDb.prepare("DELETE FROM users WHERE email = ?").run(req.params.email);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(400).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // --- Webhook & Tasks ---
+  app.post("/api/task-completed", (req, res) => {
+    const authHeader = req.headers.authorization;
+    const expectedToken = process.env.WEBHOOK_TOKEN || "your_secure_token_here";
+
+    if (!authHeader || authHeader !== `Bearer ${expectedToken}`) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const userData = getUserData(email);
-    if (userData.balance < amount) {
+    const { userId, taskInfo, earnings, transactionId } = req.body;
+
+    if (!userId || !transactionId) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
+    }
+
+    const checkTx = taskDb.prepare("SELECT id FROM processed_transactions WHERE id = ?").get(transactionId);
+    if (checkTx) {
+      return res.json({ success: true, message: "Transaction already processed" });
+    }
+
+    const amount = parseFloat(earnings) || 0;
+    const timestamp = new Date().toISOString();
+
+    const insertTask = taskDb.prepare(`
+      INSERT INTO pending_tasks (id, email, amount, taskInfo, timestamp)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    
+    try {
+      insertTask.run(transactionId, userId, amount, taskInfo || 'External Task', timestamp);
+      taskDb.prepare("INSERT INTO processed_transactions (id) VALUES (?)").run(transactionId);
+      
+      console.log(`[Webhook] Task queued for ${userId}: +$${amount}`);
+      res.json({ success: true, message: "Task queued successfully", transactionId });
+    } catch (e) {
+      console.error("Database error:", e);
+      res.status(500).json({ success: false, message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/pending-tasks", (req, res) => {
+    const email = req.query.email as string;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    const tasks = taskDb.prepare("SELECT * FROM pending_tasks WHERE email = ?").all(email);
+    res.json(tasks);
+  });
+
+  app.post("/api/mark-tasks-synced", (req, res) => {
+    const { email, taskIds } = req.body;
+    if (!email || !Array.isArray(taskIds)) {
+      return res.status(400).json({ error: "Invalid request" });
+    }
+
+    const deleteStmt = taskDb.prepare("DELETE FROM pending_tasks WHERE id = ? AND email = ?");
+    const transaction = taskDb.transaction((ids) => {
+      for (const id of ids) {
+        deleteStmt.run(id, email);
+      }
+    });
+
+    try {
+      transaction(taskIds);
+      res.json({ success: true });
+    } catch (e) {
+      console.error("Failed to delete synced tasks:", e);
+      res.status(500).json({ error: "Failed to sync" });
+    }
+  });
+
+  // --- Wallet ---
+  app.post("/api/withdraw", (req, res) => {
+    const { email, amount } = req.body;
+    
+    const user = userDb.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
+    if (!user) return res.status(404).json({ error: "User not found" });
+    
+    if (user.balance < amount) {
       return res.status(400).json({ error: "Insufficient balance" });
     }
 
-    userData.balance -= amount;
-    userData.totalWithdrawals += amount;
+    try {
+      const newBalance = user.balance - amount;
+      const newPendingBalance = user.pendingBalance + amount;
+      
+      const withdrawals = JSON.parse(user.withdrawals);
+      const newWithdrawal = {
+        id: Math.random().toString(36).substr(2, 9).toUpperCase(),
+        amount,
+        paypalEmail: req.body.paypalEmail || email,
+        date: new Date().toISOString(),
+        status: 'Pending'
+      };
+      withdrawals.unshift(newWithdrawal);
 
-    // Add a record for the withdrawal in clicks history
-    const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
-    userData.clicks.unshift({
-      id: `WITHDRAW_${Date.now()}`,
-      payout: (-amount).toFixed(2),
-      status: 'Pending',
-      timestamp,
-      taskInfo: 'Withdrawal Request',
-      type: 'Withdrawal'
-    });
-    if (userData.clicks.length > 100) userData.clicks.pop();
+      const clicks = JSON.parse(user.clicks);
+      clicks.unshift({
+        offerId: newWithdrawal.id,
+        amount: -amount,
+        timestamp: new Date().toISOString(),
+        taskInfo: 'Withdrawal Request',
+        type: 'Withdrawal'
+      });
 
-    saveUserData(email, userData);
+      userDb.prepare(`
+        UPDATE users 
+        SET balance = ?, pendingBalance = ?, withdrawals = ?, clicks = ?
+        WHERE email = ?
+      `).run(newBalance, newPendingBalance, JSON.stringify(withdrawals), JSON.stringify(clicks), email);
 
-    res.json({ 
-      success: true, 
-      balance: userData.balance,
-      totalWithdrawals: userData.totalWithdrawals
-    });
-  });
-
-  // API to explicitly register/ping a user
-  app.post("/api/register", (req, res) => {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: "Email required" });
-    
-    const stmt = db.prepare("SELECT email FROM users WHERE email = ?");
-    const exists = stmt.get(email);
-    
-    const userData = getUserData(email);
-    res.json({ success: true, email: email, isNew: !exists });
+      res.json({ success: true, balance: newBalance });
+    } catch (e) {
+      res.status(500).json({ error: "Withdrawal failed" });
+    }
   });
 
   // Vite middleware for development

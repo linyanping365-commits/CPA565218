@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
@@ -8,12 +8,9 @@ interface WalletPageProps {
   isAdmin: boolean;
   userEmail: string;
   onLogout: () => void;
-  balance: number;
-  onUpdateBalance: (balance: number) => void;
-  onAddWithdrawal: (withdrawal: any) => void;
 }
 
-export default function WalletPage({ onNavigate, currentView, isAdmin, userEmail, onLogout, balance, onUpdateBalance, onAddWithdrawal }: WalletPageProps) {
+export default function WalletPage({ onNavigate, currentView, isAdmin, userEmail, onLogout }: WalletPageProps) {
   const [paymentMethod, setPaymentMethod] = useState('Paypal');
   const [paypalEmail, setPaypalEmail] = useState('');
   const [threshold, setThreshold] = useState('100');
@@ -23,6 +20,29 @@ export default function WalletPage({ onNavigate, currentView, isAdmin, userEmail
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
+  const [balance, setBalance] = useState(0);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!userEmail) return;
+    
+    const fetchUserData = async () => {
+      try {
+        const res = await fetch(`/api/admin/users/${encodeURIComponent(userEmail)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBalance(data.balance || 0);
+          setWithdrawals(data.withdrawals || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user data:", err);
+      }
+    };
+
+    fetchUserData();
+    const interval = setInterval(fetchUserData, 5000);
+    return () => clearInterval(interval);
+  }, [userEmail]);
 
   const methods = ['Paypal'];
 
@@ -66,24 +86,17 @@ export default function WalletPage({ onNavigate, currentView, isAdmin, userEmail
       const res = await fetch('/api/withdraw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userEmail, amount })
+        body: JSON.stringify({ email: userEmail, amount, paypalEmail })
       });
-      const data = await res.json();
       
-      if (data.success) {
-        const newWithdrawal = {
-          id: Math.random().toString(36).substr(2, 9).toUpperCase(),
-          amount: amount,
-          paypalEmail: paypalEmail,
-          date: new Date().toISOString(),
-          status: 'Pending'
-        };
-        onUpdateBalance(data.balance);
-        onAddWithdrawal(newWithdrawal);
+      if (res.ok) {
+        const data = await res.json();
+        setBalance(data.balance);
         setWithdrawSuccess(true);
         setWithdrawAmount('');
         setTimeout(() => setWithdrawSuccess(false), 3000);
       } else {
+        const data = await res.json();
         setError(data.error || 'Withdrawal failed');
         setTimeout(() => setError(null), 3000);
       }
