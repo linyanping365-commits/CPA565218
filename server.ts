@@ -192,6 +192,38 @@ async function startServer() {
     res.json(users);
   });
 
+  // Admin API to add a new user
+  app.post("/api/admin/add-user", (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required" });
+
+    const stmt = db.prepare("SELECT email FROM users WHERE email = ?");
+    const exists = stmt.get(email);
+
+    if (exists) {
+      return res.status(400).json({ error: "User already exists" });
+    }
+
+    // getUserData creates the user if they don't exist
+    getUserData(email);
+    res.json({ success: true, message: "User added successfully" });
+  });
+
+  // Admin API to delete a user
+  app.post("/api/admin/delete-user", (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required" });
+
+    const stmt = db.prepare("DELETE FROM users WHERE email = ?");
+    const result = stmt.run(email);
+
+    if (result.changes > 0) {
+      res.json({ success: true, message: "User deleted successfully" });
+    } else {
+      res.status(404).json({ error: "User not found" });
+    }
+  });
+
   // Admin API to update specific user data
   app.post("/api/admin/update-user", (req, res) => {
     const { email, balance, pendingBalance, totalEarned, totalWithdrawals, clicks, taskInfo } = req.body;

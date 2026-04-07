@@ -34,6 +34,9 @@ export default function AdminDashboard({
   // User Management States
   const [users, setUsers] = useState<any[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [viewingHistory, setViewingHistory] = useState<any>(null);
   const [userClicks, setUserClicks] = useState<any[]>([]);
@@ -81,6 +84,61 @@ export default function AdminDashboard({
       console.error('Failed to fetch users:', e);
     } finally {
       setIsLoadingUsers(false);
+    }
+  };
+
+  const handleAddNewUser = async () => {
+    if (!newUserEmail.trim() || !newUserEmail.includes('@')) {
+      setNotification('❌ Please enter a valid email address.');
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/add-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newUserEmail.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNotification(`✅ User ${newUserEmail} added successfully.`);
+        setNewUserEmail('');
+        setIsAddingUser(false);
+        fetchUsers();
+        setTimeout(() => setNotification(null), 3000);
+      } else {
+        setNotification(`❌ Failed to add user: ${data.error || res.statusText}`);
+        setTimeout(() => setNotification(null), 3000);
+      }
+    } catch (e) {
+      console.error('Failed to add user:', e);
+      setNotification('❌ Error adding user.');
+      setTimeout(() => setNotification(null), 3000);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userToDelete })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNotification(`✅ User ${userToDelete} deleted successfully.`);
+        setUserToDelete(null);
+        fetchUsers();
+        setTimeout(() => setNotification(null), 3000);
+      } else {
+        setNotification(`❌ Failed to delete user: ${data.error || res.statusText}`);
+        setTimeout(() => setNotification(null), 3000);
+      }
+    } catch (e) {
+      console.error('Failed to delete user:', e);
+      setNotification('❌ Error deleting user.');
+      setTimeout(() => setNotification(null), 3000);
     }
   };
 
@@ -359,15 +417,24 @@ export default function AdminDashboard({
                     <h2 className="text-lg font-bold text-slate-800">User Dashboard Management</h2>
                     <p className="text-sm text-slate-500">Modify balance and data for registered users.</p>
                   </div>
-                  <button 
-                    onClick={fetchUsers}
-                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2 text-sm font-bold"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh List
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsAddingUser(true)}
+                      className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-2 text-sm font-bold"
+                    >
+                      <Users size={16} />
+                      Add User
+                    </button>
+                    <button 
+                      onClick={fetchUsers}
+                      className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2 text-sm font-bold"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh List
+                    </button>
+                  </div>
                 </div>
               </div>
               
@@ -440,6 +507,12 @@ export default function AdminDashboard({
                               >
                                 <Clock size={14} /> View History
                               </button>
+                              <button 
+                                onClick={() => setUserToDelete(user.email)}
+                                className="text-red-500 hover:text-red-700 flex items-center gap-1 text-xs font-bold"
+                              >
+                                <Trash2 size={14} /> Delete User
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -458,6 +531,87 @@ export default function AdminDashboard({
           )}
         </div>
       </main>
+
+      {/* Add User Modal */}
+      {isAddingUser && (
+        <div className="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+              <h3 className="font-bold text-slate-800">Add New User</h3>
+              <button onClick={() => setIsAddingUser(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-600 mb-1">User Email</label>
+                <input 
+                  type="email"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-indigo-500 text-sm"
+                />
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
+              <button 
+                onClick={() => setIsAddingUser(false)}
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-bold text-gray-500 hover:bg-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleAddNewUser}
+                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors shadow-md"
+              >
+                Add User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-red-50">
+              <h3 className="font-bold text-red-800 flex items-center gap-2">
+                <AlertCircle size={18} />
+                Confirm Deletion
+              </h3>
+              <button onClick={() => setUserToDelete(null)} className="text-red-400 hover:text-red-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-600">
+                Are you sure you want to delete the user <strong className="text-slate-800">{userToDelete}</strong>? 
+                This action cannot be undone and all their data will be lost.
+              </p>
+            </div>
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
+              <button 
+                onClick={() => setUserToDelete(null)}
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-bold text-gray-500 hover:bg-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDeleteUser}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition-colors shadow-md"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit User Modal */}
       {editingUser && (
