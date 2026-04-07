@@ -3,12 +3,26 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
-import fs from "fs";
+import Database from "better-sqlite3";
 import { ALL_OFFERS } from "./src/lib/offersData.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DATA_FILE = path.join(__dirname, "user_data.json");
+
+// Initialize SQLite Database
+const db = new Database(path.join(__dirname, "database.sqlite"));
+
+// Create tables if they don't exist
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    email TEXT PRIMARY KEY,
+    balance REAL DEFAULT 0,
+    pendingBalance REAL DEFAULT 0,
+    totalEarned REAL DEFAULT 0,
+    totalWithdrawals REAL DEFAULT 0,
+    clicks TEXT DEFAULT '[]'
+  );
+`);
 
 async function startServer() {
   const app = express();
@@ -16,45 +30,55 @@ async function startServer() {
 
   app.use(cors());
   
-  // Load initial data from file if it exists
-  let initialData = {};
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const content = fs.readFileSync(DATA_FILE, "utf-8");
-      initialData = JSON.parse(content);
-      console.log("Loaded user data from file.");
-    }
-  } catch (e) {
-    console.error("Failed to load user data:", e);
-  }
-
-  // In-memory user data store
-  const userStore = new Map<string, any>(Object.entries(initialData));
-  
-  const saveUserData = () => {
-    try {
-      const data = Object.fromEntries(userStore);
-      fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-    } catch (e) {
-      console.error("Failed to save user data:", e);
-    }
-  };
-
   // To track processed transaction IDs (idempotency)
   const processedTransactions = new Set<string>();
 
   const getUserData = (email: string) => {
-    if (!userStore.has(email)) {
-      userStore.set(email, { 
-        balance: 0, 
-        pendingBalance: 0, 
-        totalEarned: 0, 
-        totalWithdrawals: 0, 
-        clicks: [] 
-      });
-      saveUserData();
+    const stmt = db.prepare("SELECT * FROM users WHERE email = ?");
+    let user = stmt.get(email) as any;
+    
+    if (!user) {
+      const insertStmt = db.prepare(`
+        INSERT INTO users (email, balance, pendingBalance, totalEarned, totalWithdrawals, clicks)
+        VALUES (?, 0, 0, 0, 0, '[]')
+      `);
+      insertStmt.run(email);
+      user = {
+        email,
+        balance: 0,
+        pendingBalance: 0,
+        totalEarned: 0,
+        totalWithdrawals: 0,
+        clicks: '[]'
+      };
     }
-    return userStore.get(email)!;
+    
+    // Parse clicks JSON
+    if (typeof user.clicks === 'string') {
+      try {
+        user.clicks = JSON.parse(user.clicks);
+      } catch (e) {
+        user.clicks = [];
+      }
+    }
+    
+    return user;
+  };
+
+  const saveUserData = (email: string, data: any) => {
+    const stmt = db.prepare(`
+      UPDATE users 
+      SET balance = ?, pendingBalance = ?, totalEarned = ?, totalWithdrawals = ?, clicks = ?
+      WHERE email = ?
+    `);
+    stmt.run(
+      data.balance, 
+      data.pendingBalance, 
+      data.totalEarned, 
+      data.totalWithdrawals, 
+      JSON.stringify(data.clicks), 
+      email
+    );
   };
 
   // API routes
@@ -133,7 +157,7 @@ async function startServer() {
 
     // Mark transaction as processed
     processedTransactions.add(transactionId);
-    saveUserData();
+    saveUserData(userId, userData);
 
     console.log(`[Webhook] Task completed for ${userId}: +$${amount}. New balance: $${userData.balance}`);
     
@@ -147,16 +171,23 @@ async function startServer() {
 
   // Admin API to list all users
   app.get("/api/admin/users", (req, res) => {
-    console.log(`[Admin] Fetching users. Current store size: ${userStore.size}`);
-    const users = Array.from(userStore.entries()).map(([email, data]) => ({
-      email,
-      balance: data.balance,
-      pendingBalance: data.pendingBalance,
-      totalEarned: data.totalEarned,
-      totalWithdrawals: data.totalWithdrawals,
-      clicksCount: data.clicks.length,
-      lastActivity: data.clicks[0]?.timestamp || 'Never'
-    }));
+    const stmt = db.prepare("SELECT * FROM users");
+    const rows = stmt.all() as any[];
+    
+    const users = rows.map(row => {
+      let clicks = [];
+      try { clicks = JSON.parse(row.clicks); } catch(e) {}
+      return {
+        email: row.email,
+        balance: row.balance,
+        pendingBalance: row.pendingBalance,
+        totalEarned: row.totalEarned,
+        totalWithdrawals: row.totalWithdrawals,
+        clicksCount: clicks.length,
+        lastActivity: clicks[0]?.timestamp || 'Never'
+      };
+    });
+    
     console.log(`[Admin] Returning ${users.length} users.`);
     res.json(users);
   });
@@ -189,7 +220,7 @@ async function startServer() {
     if (typeof totalWithdrawals === 'number') userData.totalWithdrawals = totalWithdrawals;
     if (Array.isArray(clicks)) userData.clicks = clicks;
 
-    saveUserData();
+    saveUserData(email, userData);
 
     res.json({ 
       success: true, 
@@ -228,7 +259,7 @@ async function startServer() {
     });
     if (userData.clicks.length > 100) userData.clicks.pop();
 
-    saveUserData();
+    saveUserData(email, userData);
 
     res.json({ 
       success: true, 
@@ -242,8 +273,11 @@ async function startServer() {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email required" });
     
+    const stmt = db.prepare("SELECT email FROM users WHERE email = ?");
+    const exists = stmt.get(email);
+    
     const userData = getUserData(email);
-    res.json({ success: true, email: email, isNew: !userStore.has(email) });
+    res.json({ success: true, email: email, isNew: !exists });
   });
 
   // Vite middleware for development
